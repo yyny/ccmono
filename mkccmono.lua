@@ -113,9 +113,9 @@ end
 local out = pcf.create()
 out.metrics = rep(
 	{ left_sided_bearing   = 0
-	, right_side_bearing   = 7
-	, character_width      = 7
-	, character_ascent     = 9
+	, right_side_bearing   = 6
+	, character_width      = 6
+	, character_ascent     = 8
 	, character_descent    = 1
 	, character_attributes = 0
 	}, 256)
@@ -127,18 +127,18 @@ out.properties["SLANT"] = "R"
 out.properties["SETWIDTH_NAME"] = "Normal"
 out.properties["ADD_STYLE_NAME"] = ""
 out.properties["PIXEL_SIZE"] = 10
-out.properties["POINT_SIZE"] = 100
+out.properties["POINT_SIZE"] = 50
 out.properties["RESOLUTION_X"] = 100
 out.properties["RESOLUTION_Y"] = 100
 out.properties["SPACING"] = "C"
-out.properties["AVERAGE_WIDTH"] = 70
+out.properties["AVERAGE_WIDTH"] = 60
 out.properties["CHARSET_REGISTRY"] = "ISO8859"
 out.properties["CHARSET_ENCODING"] = "1"
 out.properties["COPYRIGHT"] = "MIT"
 out.properties["CAP_HEIGHT"] = 7
 out.properties["X_HEIGHT"] = 5
 out.properties["WEIGHT"] = 10
-out.properties["QUAD_WIDTH"] = 7
+out.properties["QUAD_WIDTH"] = 6
 out.properties["FONT"] = "-" .. def(out.properties["FOUNDRY"])
                       .. "-" .. def(out.properties["FAMILY_NAME"])
                       .. "-" .. def(out.properties["WEIGHT_NAME"])
@@ -175,7 +175,7 @@ out.swidths = rep(def(out.properties["POINT_SIZE"], 100) * 4, 256)
 out.bitmaps = function(self)
 	local glyphs = {}
 	for n=1,256 do
-		local glyph = pcf.bitset(7*10)
+		local glyph = pcf.bitset(6*9)
 		local i = 1
 		local r = n-1
 		-- We act as if there is a 1px border around each character (this isn't
@@ -183,8 +183,8 @@ out.bitmaps = function(self)
 		--  than messing with the metrics)
 		-- I believe that in ComputerCraft each glyph overlaps the previous one
 		--  by one pixel.
-		for y=1,10 do
-			for x=1,7 do
+		for y=2,10 do
+			for x=2,7 do
 				glyph[i] = d.data[1+(y-1)+11*((r // 16))][1+(x-1)+8*(r % 16)] == 1
 				i = i + 1
 			end
@@ -193,7 +193,7 @@ out.bitmaps = function(self)
 	end
 	return glyphs
 end
-out.ink_metrics = calc_metrics(out.bitmaps(out),8,11,0,8)
+out.ink_metrics = calc_metrics(out.bitmaps(out),6,9,0,8)
 out.accelerators.noOverlap       = 1
 out.accelerators.constantMetrics = 1
 out.accelerators.terminalFont    = 1
@@ -202,7 +202,7 @@ out.accelerators.inkInside       = 1
 out.accelerators.inkMetrics      = 1
 out.accelerators.drawDirection   = 0
 out.accelerators.realpadding     = 0
-out.accelerators.fontAscent      = 9
+out.accelerators.fontAscent      = 8
 out.accelerators.fontDescent     = 1
 out.accelerators.maxOverlap      = 0
 out.accelerators.minbounds = calc_bounds(out.metrics, math.min, 8)
@@ -211,16 +211,16 @@ out.accelerators.ink_minbounds = calc_bounds(out.ink_metrics, math.min, 8)
 out.accelerators.ink_maxbounds = calc_bounds(out.ink_metrics, math.max, 8)
 out.bdf_accelerators = out.accelerators
 
-local f = assert(io.open('ccmono7x10r.pcf', 'wb'))
+local f = assert(io.open('ccmono6x9r.pcf', 'wb'))
 pcf.write(out, f)
 f:close()
 
 local out = pcf.create()
 out.metrics = rep(
 	{ left_sided_bearing   = 0
-	, right_side_bearing   = 14
-	, character_width      = 14
-	, character_ascent     = 18
+	, right_side_bearing   = 12
+	, character_width      = 12
+	, character_ascent     = 16
 	, character_descent    = 2
 	, character_attributes = 0
 	}, 256)
@@ -236,14 +236,14 @@ out.properties["POINT_SIZE"] = 100
 out.properties["RESOLUTION_X"] = 100
 out.properties["RESOLUTION_Y"] = 100
 out.properties["SPACING"] = "C"
-out.properties["AVERAGE_WIDTH"] = 140
+out.properties["AVERAGE_WIDTH"] = 120
 out.properties["CHARSET_REGISTRY"] = "ISO8859"
 out.properties["CHARSET_ENCODING"] = "1"
 out.properties["COPYRIGHT"] = "MIT"
 out.properties["CAP_HEIGHT"] = 14
 out.properties["X_HEIGHT"] = 10
 out.properties["WEIGHT"] = 20
-out.properties["QUAD_WIDTH"] = 14
+out.properties["QUAD_WIDTH"] = 12
 out.properties["FONT"] = "-" .. def(out.properties["FOUNDRY"])
                       .. "-" .. def(out.properties["FAMILY_NAME"])
                       .. "-" .. def(out.properties["WEIGHT_NAME"])
@@ -275,18 +275,18 @@ out.swidths = rep(def(out.properties["POINT_SIZE"], 100) * 4, 256)
 out.bitmaps = function(self)
 	local glyphs = {}
 	for n=1,256 do
-		local glyph = pcf.bitset(14*20)
+		local glyph = pcf.bitset(12*18)
 		local i = 1
 		local r = n-1
-		for y=1,10 do -- Act as if there is a 1px border around each character (even though this isn't always the case, it makes the font look better)
-			for x=1,7 do
+		for y=2,10 do -- Act as if there is a 1px border around each character (even though this isn't always the case, it makes the font look better)
+			for x=2,7 do
 				glyph[i] = d.data[1+(y-1)+11*((r // 16))][1+(x-1)+8*(r % 16)] == 1
 				i = i + 1
 				glyph[i] = d.data[1+(y-1)+11*((r // 16))][1+(x-1)+8*(r % 16)] == 1
 				i = i + 1
 			end
-			for n=1,14 do
-				glyph[i] = glyph[i-14]
+			for n=1,12 do
+				glyph[i] = glyph[i-12]
 				i = i + 1
 			end
 		end
@@ -294,7 +294,7 @@ out.bitmaps = function(self)
 	end
 	return glyphs
 end
-out.ink_metrics = calc_metrics(out.bitmaps(out),8*2,11*2,0,8*2)
+out.ink_metrics = calc_metrics(out.bitmaps(out),6*2,9*2,0,8)
 out.accelerators.noOverlap       = 1
 out.accelerators.constantMetrics = 1
 out.accelerators.terminalFont    = 1
@@ -303,20 +303,20 @@ out.accelerators.inkInside       = 1
 out.accelerators.inkMetrics      = 1
 out.accelerators.drawDirection   = 0
 out.accelerators.realpadding     = 0
-out.accelerators.fontAscent      = 9*2
+out.accelerators.fontAscent      = 8*2
 out.accelerators.fontDescent     = 1*2
 out.accelerators.maxOverlap      = 0
-out.accelerators.minbounds = calc_bounds(out.metrics, math.min, 8*2)
-out.accelerators.maxbounds = calc_bounds(out.metrics, math.max, 8*2)
-out.accelerators.ink_minbounds = calc_bounds(out.ink_metrics, math.min, 8*2)
-out.accelerators.ink_maxbounds = calc_bounds(out.ink_metrics, math.max, 8*2)
+out.accelerators.minbounds = calc_bounds(out.metrics, math.min, 8)
+out.accelerators.maxbounds = calc_bounds(out.metrics, math.max, 8)
+out.accelerators.ink_minbounds = calc_bounds(out.ink_metrics, math.min, 8)
+out.accelerators.ink_maxbounds = calc_bounds(out.ink_metrics, math.max, 8)
 out.bdf_accelerators = out.accelerators
 
-local f = assert(io.open('ccmono14x20r.pcf', 'wb'))
+local f = assert(io.open('ccmono12x18r.pcf', 'wb'))
 pcf.write(out, f)
 f:close()
 
-local f = assert(io.open('./ccmono7x10r.pcf', 'rb'))
+local f = assert(io.open('./ccmono6x9r.pcf', 'rb'))
  -- Test if the `*.pcf` reader runs without crashing
  -- Uncomment the following lines for more information
 local result = pcf.read(f)

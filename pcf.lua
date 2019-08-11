@@ -1,5 +1,6 @@
 #!/usr/bin/env lua
 local bitset = require "bitset"
+local asciigrid = require "asciigrid"
 
 -- Library for reading and writing PCF fonts
 -- It is specifically tested for reading and writing the ccmono fonts, but
@@ -109,19 +110,19 @@ function pcf.readmetrics(f, format, compressed)
 	if compressed == nil then
 		compressed = format.format & PCF_COMPRESSED_METRICS ~= 0
 	end
-	local left_sided_bearing, right_side_bearing, character_width, character_ascent, character_descent, character_attributes
+	local left_side_bearing, right_side_bearing, character_width, character_ascent, character_descent, character_attributes
 	character_attributes = 0
 	if compressed then
-		left_sided_bearing, right_side_bearing, character_width, character_ascent, character_descent = string.unpack("BBBBB", f:read(5))
-		left_sided_bearing = left_sided_bearing - 0x80
+		left_side_bearing, right_side_bearing, character_width, character_ascent, character_descent = string.unpack("BBBBB", f:read(5))
+		left_side_bearing = left_side_bearing - 0x80
 		right_side_bearing = right_side_bearing - 0x80
 		character_width = character_width - 0x80
 		character_ascent = character_ascent - 0x80
 		character_descent = character_descent - 0x80
 	else
-		left_sided_bearing, right_side_bearing, character_width, character_ascent, character_descent, character_attributes = string.unpack(format.endian .. "i2i2i2i2i2I2", f:read(12))
+		left_side_bearing, right_side_bearing, character_width, character_ascent, character_descent, character_attributes = string.unpack(format.endian .. "i2i2i2i2i2I2", f:read(12))
 	end
-	return {left_sided_bearing=left_sided_bearing, right_side_bearing=right_side_bearing, character_width=character_width, character_ascent=character_ascent, character_descent=character_descent, character_attributes=character_attributes}
+	return { left_side_bearing=left_side_bearing, right_side_bearing=right_side_bearing, character_width=character_width, character_ascent=character_ascent, character_descent=character_descent, character_attributes=character_attributes }
 end
 function pcf.writemetrics(self, data, f, format, compress)
 	local fmt = pcf.parseformat(format)
@@ -129,14 +130,14 @@ function pcf.writemetrics(self, data, f, format, compress)
 		compress = format & PCF_COMPRESSED_METRICS ~= 0
 	end
 	if compress then
-		write(f, fmt.endian .. 'B', 0x80 + data.left_sided_bearing)
+		write(f, fmt.endian .. 'B', 0x80 + data.left_side_bearing)
 		write(f, fmt.endian .. 'B', 0x80 + data.right_side_bearing)
 		write(f, fmt.endian .. 'B', 0x80 + data.character_width)
 		write(f, fmt.endian .. 'B', 0x80 + data.character_ascent)
 		write(f, fmt.endian .. 'B', 0x80 + data.character_descent)
 		return 5
 	else
-		write(f, fmt.endian .. 'i2', data.left_sided_bearing)
+		write(f, fmt.endian .. 'i2', data.left_side_bearing)
 		write(f, fmt.endian .. 'i2', data.right_side_bearing)
 		write(f, fmt.endian .. 'i2', data.character_width)
 		write(f, fmt.endian .. 'i2', data.character_ascent)
@@ -148,7 +149,7 @@ end
 function pcf.show_metric_bounds(bounds)
 	return table.concat
 		{ '{ '
-		, 'left_sided_bearing: ', bounds.left_sided_bearing, ', '
+		, 'left_side_bearing: ', bounds.left_side_bearing, ', '
 		, 'right_side_bearing: ', bounds.right_side_bearing, ', '
 		, 'character_width: ', bounds.character_width, ', '
 		, 'character_ascent: ', bounds.character_ascent, ', '
@@ -220,31 +221,50 @@ function pcf.readtable(f, table, data)
 end
 
 function pcf.show_metrics(data)
+	local function metrics_to_rows()
+		local result = {}
+		for n, metric in ipairs(data.metrics) do
+			local repr = utf8.char(n-1)
+			if n-1 < 32 or n-1 >= 127 and n-1 <= 159 then
+				repr = "\\x" .. ("%.2x"):format(n-1)
+			end
+			result[#result + 1] = { "'" .. repr .. "'", "(" .. tonumber(n-1) .. ")", metric.left_side_bearing, metric.right_side_bearing, metric.character_width, metric.character_ascent, metric.character_descent, metric.character_attributes }
+		end
+		return result
+	end
 	local result = ''
-	result = result .. 'normal metrics:\n'
-	for n=1,#data.metrics do
-		local metric = data.metrics[n]
-		result = result .. "'" .. utf8.char(n-1) .. "' (" .. tonumber(n-1) .. "): "
-		result = result .. '{ '
-		result = result .. 'left sided bearing:   ' .. metric.left_sided_bearing .. ', '
-		result = result .. 'right side bearing:   ' .. metric.right_side_bearing .. ', '
-		result = result .. 'character width:      ' .. metric.character_width .. ', '
-		result = result .. 'character ascent:     ' .. metric.character_ascent .. ', '
-		result = result .. 'character descent:    ' .. metric.character_descent .. ', '
-		result = result .. 'character attributes: ' .. metric.character_attributes .. ' }\n'
-	end
-	result = result .. 'ink metrics:\n'
-	for n=1,#data.ink_metrics do
-		local metric = data.ink_metrics[n]
-		result = result .. "'" .. utf8.char(n-1) .. "' (" .. tonumber(n-1) .. "): "
-		result = result .. '{ '
-		result = result .. 'left sided bearing:   ' .. metric.left_sided_bearing .. ', '
-		result = result .. 'right side bearing:   ' .. metric.right_side_bearing .. ', '
-		result = result .. 'character width:      ' .. metric.character_width .. ', '
-		result = result .. 'character ascent:     ' .. metric.character_ascent .. ', '
-		result = result .. 'character descent:    ' .. metric.character_descent .. ', '
-		result = result .. 'character attributes: ' .. metric.character_attributes .. ' }\n'
-	end
+	local grid = assert(asciigrid({
+		title = 'normal metrics',
+		header_type = 'arrows',
+		column_justify = { 'center', 'right' },
+		column_headers = { 'character representation',
+			               'character code',
+						   'left side bearing',
+						   'right side bearing',
+						   'character width',
+						   'character ascent',
+						   'character descent',
+						   'character attributes' },
+		rows = metrics_to_rows(data.metrics),
+		callbacks = { string_length = utf8.len }
+	}))
+	result = result .. table.concat(grid.lines, '\n') .. '\n'
+	local grid = assert(asciigrid({
+		title = 'ink metrics',
+		header_type = 'arrows',
+		column_justify = { 'center', 'right' },
+		column_headers = { 'character representation',
+			               'character code',
+						   'left side bearing',
+						   'right side bearing',
+						   'character width',
+						   'character ascent',
+						   'character descent',
+						   'character attributes' },
+		rows = metrics_to_rows(data.metrics),
+		callbacks = { string_length = utf8.len }
+	}))
+	result = result .. table.concat(grid.lines, '\n') .. '\n'
 	return result
 end
 function pcf.show_encodings(data)
@@ -291,8 +311,8 @@ function pcf.show_glyphs(data, options)
 	options = options or {}
 	local borders = options.borders or true
 	local charset = options.charset or '.#'
-	local w = options.width or data.metrics[1].character_width
-	local h = options.height or data.metrics[1].character_ascent + data.metrics[1].character_descent
+	local w = options.width or data.properties["QUAD_WIDTH"]
+	local h = options.height or data.properties["PIXEL_SIZE"]
 	local chars_per_row = options.chars_per_row or 8
 	local n = 0
 	local bitmaps = data.bitmaps(data)
@@ -403,8 +423,13 @@ function pcf.tablewriters.properties(self, f, data, format)
 	end
 	for n=1,#data do
 		local value = data[n].value
-		local isstr = type(value) == 'string'
-		write(f, fmt.endian .. 'i4bi4', nameoffs[n], isstr and 1 or 0, isstr and valueoffs[n] or value)
+		if type(value) == 'string' then
+			write(f, fmt.endian .. 'i4bi4', nameoffs[n], 1, valueoffs[n])
+		elseif type(value) == 'number' then
+			write(f, fmt.endian .. 'i4bi4', nameoffs[n], 0, value)
+		else
+			error('property "' .. data[n].name .. '" is neither a string nor a number')
+		end
 	end
 	local padding = pad(f)
 	write(f, fmt.endian .. 'i4', #s)
@@ -472,8 +497,8 @@ function pcf.tablewriters.bitmaps(self, f, data, format)
 	write(f, fmt.endian .. 'i4', #data)
 	local offsets = {}
 	local s = ''
-	local w = self.metrics[1].character_width
-	local h = self.metrics[1].character_ascent + self.metrics[1].character_descent
+	local w = self.properties["QUAD_WIDTH"].value
+	local h = self.properties["PIXEL_SIZE"].value
 	local glyphsize = math.ceil((w*h)/8)
 	for n=1,#data do
 		offsets[n] = #s
@@ -569,6 +594,9 @@ function pcf.tablereaders.properties(self, f)
 		local property = properties[n]
 		local name = string.match(strings, "[^\0]*", property.name_off+1)
 		local value = property.isstr and string.match(strings, "[^\0]*", property.value_off+1) or property.value_off
+		if not name or not value then
+			error('too few properties (' .. nprops .. ' expected, got ' .. n-1 .. ')')
+		end
 		property.index = n
 		property.name = name
 		property.value = value
@@ -650,8 +678,8 @@ function pcf.tablereaders.bitmaps(self, f)
 			end
 			return result
 		end
-		local w = self.metrics[1].character_width
-		local h = self.metrics[1].character_ascent + self.metrics[1].character_descent
+		local w = self.properties["QUAD_WIDTH"]
+		local h = self.properties["PIXEL_SIZE"]
 		for x=1,glyph_count do
 			local glyph_data_size = math.max(format.padding, format.storesize)*h
 			local glyph_data = bitmap_data:sub(glyph_offsets[x]+1,glyph_offsets[x]+glyph_data_size)

@@ -35,6 +35,16 @@ compressiontypes[6 ] = "BI_ALPHABITFIELDS" -- RGBA bit field masks          | on
 compressiontypes[11] = "BI_CMYK"           -- none                          | only Windows Metafile CMYK[3]
 compressiontypes[12] = "BI_CMYKRLE8"       -- RLE-8                         | only Windows Metafile CMYK
 compressiontypes[13] = "BI_CMYKRLE4"       -- RLE-4                         | only Windows Metafile CMYK
+compressiontypes["BI_RGB"]            = 0
+compressiontypes["BI_RLE8"]           = 1
+compressiontypes["BI_RLE4"]           = 2
+compressiontypes["BI_BITFIELDS"]      = 3
+compressiontypes["BI_JPEG"]           = 4
+compressiontypes["BI_PNG"]            = 5
+compressiontypes["BI_ALPHABITFIELDS"] = 6
+compressiontypes["BI_CMYK"]           = 11
+compressiontypes["BI_CMYKRLE8"]       = 12
+compressiontypes["BI_CMYKRLE4"]       = 13
 
 local bmp = {}
 function bmp.read(f)
@@ -48,10 +58,10 @@ function bmp.read_file_header(f)
 	if magic ~= 'BM' and magic ~= 'BA' and magic ~= 'CI' and magic ~= 'CP' and magic ~= 'IC' and magic ~= 'PT' then
 		return nil, 'invalid header start'
 	end
-	string.unpack('<I4', f:read(4))
+	local filesize = string.unpack('<I4', f:read(4))
 	local reserved = f:read(4)
 	local imageoff = string.unpack('<I4', f:read(4))
-	return { header=magic, reserved=reserved, imagedata_offset=imageoff }
+	return { header=magic, filesize=filesize, reserved=reserved, imagedata_offset=imageoff }
 end
 function bmp.read_header(f, imagedata_offset)
 	local result = {}
@@ -93,7 +103,7 @@ function bmp.read_header(f, imagedata_offset)
 
 	result.colors = {}
 	if result.ncolors and result.ncolors > 0 then
-		for n=0,result.ncolors do
+		for n=1,result.ncolors do
 			result.colors[n] = string.unpack('<I4', f:read(4))
 		end
 	end
@@ -103,17 +113,24 @@ function bmp.read_header(f, imagedata_offset)
 	for y=1,result.height do
 		result.data[y] = {}
 	end
-	if result.compression == 0 then
-		for y=result.height-1,1,-1 do
+	if result.compression == compressiontypes.BI_RGB then
+		for y=result.height,1,-1 do
 			for x=1,result.width do
 				local b,g,r = string.unpack('BBB', f:read(3))
 				result.data[y][x] = { r, g, b }
 			end
-			f:read(3 - ((f:seek()-1) % 4))
+			-- f:read(3 - ((f:seek()-1) % 4))
 		end
-	elseif result.compression == 1 then
+	elseif result.compression == compressiontypes.BI_BITFIELDS then
+		for y=result.height,1,-1 do
+			for x=1,result.width do
+				result.data[y][x] = string.unpack('<I4', f:read(4))
+			end
+			-- f:read(3 - ((f:seek()-1) % 4))
+		end
+	elseif result.compression == compressiontypes.BI_RLE8 then
 		local x = 1
-		local y = result.height-1
+		local y = result.height
 		while true do
 			local rep = string.unpack('B', f:read(1))
 			if rep == 0 then
@@ -145,7 +162,32 @@ function bmp.read_header(f, imagedata_offset)
 			end
 		end
 	else
-		error 'compression mode not yet supported'
+		error('compression mode ' .. compressiontypes[result.compression] .. ' not yet supported')
+	end
+
+	function result:get(x, y)
+		local function ctz(x)
+			local i = 0
+			while x & 1 == 0 do
+				i = i + 1
+				x = x >> 1
+			end
+			return i
+		end
+		local function u32torgba(u32)
+			local r = (u32 & self.redmask   or 0x0000ff) >> ctz(self.redmask  )
+			local g = (u32 & self.greenmask or 0x00ff00) >> ctz(self.greenmask)
+			local b = (u32 & self.bluemask  or 0xff0000) >> ctz(self.bluemask )
+			local a = (u32 & self.alphamask or 0x000000) >> ctz(self.alphamask)
+			return { r, g, b, a }
+		end
+		local function torgba(val)
+			if result.compression == compressiontypes.BI_BITFIELDS then
+				return u32torgba(val)
+			end
+			return u32torgba(self.colors[val+1])
+		end
+		return torgba(self.data[y][x])
 	end
 
 	return result

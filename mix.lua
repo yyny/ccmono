@@ -2,6 +2,7 @@
 
 -- Generates a function usable by `__index` metamethod that will search
 --  or call it's arguments from left to right
+-- Can be used to create mixins
 local function mix(...) local args = { ... }
 	assert(#args > 0)
 	if #args == 1 then return args[1] end

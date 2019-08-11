@@ -2,6 +2,7 @@
 local mix = require "mix"
 local bitset = {}
 
+-- Library for memory-efficient storage of long lists of bits
 local function charoff(pos)
 	return 1 + (pos - 1) // 8
 end
@@ -71,6 +72,7 @@ function bitset:get(pos)
 	end
 	local charpos = charoff(pos)
 	local charvalue = string.byte(self.data:sub(charpos,charpos))
+	if not charvalue then return nil end
 	return charvalue & (1 << bitoff(pos)) ~= 0
 end
 function bitset:set(pos, value)

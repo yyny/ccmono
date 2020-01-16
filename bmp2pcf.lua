@@ -19,55 +19,6 @@ end
 local function basename(path)
 	return path:match("([^/]-)%.[^.]-$")
 end
--- Function for generating the glyphs
--- (almost) black colors mark background, other colors mark foreground
-local function bitmaps(self)
-	local glyphs = {}
-	for n=1,config.numglyphs do
-		local glyph = pcf.bitset(config.scale*config.glyphwidth * config.scale*config.glyphheight)
-		local i = 1
-		local r = n-1
-		for y=1,config.glyphheight do
-			for o=1,config.scale do
-				for x=1,config.glyphwidth do
-					local val = img:get(x+(config.glyphwidth + config.padleft + config.padright)*(r % config.width) + config.padleft, y+(config.glyphheight + config.padtop + config.padbottom)*(r // config.width) + config.padtop)
-					for p=1,config.scale do
-						glyph[i] = val[1] >= 32 or val[2] >= 32 or val[3] >= 32
-						i = i + 1
-					end
-				end
-			end
-		end
-		glyphs[n] = glyph
-	end
-	return glyphs
-end
-local function glyphwidth(glyph)
-	local first = glyph.height
-	local last = 0
-	for y=1,glyph.height do
-		for x=1,glyph.width do
-			if glyph.data[glyph.width*(y-1) + x] then
-				first = math.min(first, x)
-				last = math.max(last, x)
-			end
-		end
-	end
-	return math.max(last - first, 0)
-end
-local function glyphheight(glyph)
-	local first = glyph.width
-	local last = 0
-	for x=1,glyph.width do
-		for y=1,glyph.height do
-			if glyph.data[glyph.width*(y-1) + x] then
-				first = math.min(first, y)
-				last = math.max(last, y)
-			end
-		end
-	end
-	return math.max(last - first + 1, 0)
-end
 local function printusage()
 	print "Usage: bmp2pcf <infile> <outfile> [OPTIONS...]"
 	print "Options:"
@@ -100,16 +51,18 @@ local function printusage()
 	print "  --scale <N>           scale the font by N times               (default: '1')"
 	print "  --padleft <px>        number of pixels left of each glyph     (default: '0')"
 	print "  --padright <px>       number of pixels right of each glyph    (default: '0')"
-	print "  --padtop <px>         number of pixels above of each glyph    (default: '0')"
-	print "  --padbottom <px>      number of pixels under of each glyph    (default: '0')"
+	print "  --padtop <px>         number of pixels above each glyph       (default: '0')"
+	print "  --padbottom <px>      number of pixels under each glyph       (default: '0')"
+	print "  --invert              invert meaning of light/dark pixels"
 	os.exit(1)
 end
-local options = { 'width', 'height', 'quadwidth', 'glyphwidth', 'glyphheight',
+local options = { 'width', 'height', 'glyphwidth', 'glyphheight',
 				  'fontregistry', 'foundry', 'family', 'weight', 'weightnum',
 	              'slant', 'setwidth', 'addstyle', 'pixelsize', 'pointsize',
 	              'resx', 'resx', 'spacing', 'avgwidth', 'registry',
 	              'encoding', 'copyright', 'comment', 'capheight', 'xheight',
 	              'numglyphs', 'scale', 'padleft', 'padright', 'padtop', 'padbottom' }
+local flags = { 'invert' }
 
 if #arg < 2 then
 	printusage()
@@ -122,10 +75,19 @@ local n = 3
 while n < #arg do
 	local valid = false
 	for i=1,#options do
+		if valid then break end
 		local option = options[i]
 		if arg[n] == '--' .. option then
 			n = n + 1
 			config[option] = arg[n]
+			valid = true
+		end
+	end
+	for i=1,#flags do
+		if valid then break end
+		local flag = flags[i]
+		if arg[n] == '--' .. flag then
+			config[flag] = true
 			valid = true
 		end
 	end
@@ -172,9 +134,67 @@ config.avgwidth     = math.tointeger(config.avgwidth) or 100
 config.registry     = config.registry or 'ISO8859'
 config.encoding     = config.encoding or '1'
 config.numglyphs    = math.tointeger(config.numglyphs) or config.width*config.height
+config.invert       = config.invert or false
 
 if config.numglyphs > 256 then
 	die("multi-byte encodings not yet supported")
+end
+
+local function isset(val)
+	local result = val[1] >= 32 or val[2] >= 32 or val[3] >= 32
+	if config.invert then
+		result = not result
+	end
+	return result
+end
+-- Function for generating the glyphs
+-- (almost) black colors mark background, other colors mark foreground
+local function bitmaps(self)
+	local glyphs = {}
+	for n=1,config.numglyphs do
+		local glyph = pcf.bitset(config.scale*config.glyphwidth * config.scale*config.glyphheight)
+		local i = 1
+		local r = n-1
+		for y=1,config.glyphheight do
+			for o=1,config.scale do
+				for x=1,config.glyphwidth do
+					local val = img:get(x+(config.glyphwidth + config.padleft + config.padright)*(r % config.width) + config.padleft, y+(config.glyphheight + config.padtop + config.padbottom)*(r // config.width) + config.padtop)
+					glyph[i] = isset(val)
+					for p=1,config.scale do
+						i = i + 1
+					end
+				end
+			end
+		end
+		glyphs[n] = glyph
+	end
+	return glyphs
+end
+local function glyphwidth(glyph)
+	local first = glyph.height
+	local last = 0
+	for y=1,glyph.height do
+		for x=1,glyph.width do
+			if glyph.data[glyph.width*(y-1) + x] then
+				first = math.min(first, x)
+				last = math.max(last, x)
+			end
+		end
+	end
+	return math.max(last - first, 0)
+end
+local function glyphheight(glyph)
+	local first = glyph.width
+	local last = 0
+	for x=1,glyph.width do
+		for y=1,glyph.height do
+			if glyph.data[glyph.width*(y-1) + x] then
+				first = math.min(first, y)
+				last = math.max(last, y)
+			end
+		end
+	end
+	return math.max(last - first + 1, 0)
 end
 
 local glyphs = bitmaps(nil)
@@ -193,7 +213,7 @@ if true then
 		io.write('|')
 		for x=1,img.width do
 			local val = img:get(x, y)
-			io.write(val[1] <= 64 and val[2] <= 64 and val[3] <= 64 and '.' or '#')
+			io.write(isset(val) and '.' or '#')
 		end
 		io.write('|\n')
 	end
@@ -369,6 +389,12 @@ out.accelerators.maxbounds       = calc_bounds(out.metrics, math.max, 8)
 out.accelerators.ink_minbounds   = calc_bounds(out.ink_metrics, math.min, 8)
 out.accelerators.ink_maxbounds   = calc_bounds(out.ink_metrics, math.max, 8)
 out.bdf_accelerators = out.accelerators
+
+-- sanity checks
+
+-- if def(out.properties["FAMILY_NAME"]):match("-") then
+-- 	die("family name cannot contain a dash (-) as it is used as a delimiter")
+-- end
 
 local f = assert(io.open(outfile, 'wb'))
 pcf.write(out, f)

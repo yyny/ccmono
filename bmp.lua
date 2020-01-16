@@ -48,7 +48,10 @@ compressiontypes["BI_CMYKRLE4"]       = 13
 
 local bmp = {}
 function bmp.read(f)
-	local header = bmp.read_file_header(f)
+	local header, err = bmp.read_file_header(f)
+	if not header then
+		return nil, err
+	end
 	local result = bmp.read_header(f, header.imagedata_offset)
 	result.header = header
 	return result
@@ -101,10 +104,11 @@ function bmp.read_header(f, imagedata_offset)
 		result.reserved    = string.unpack('<I4', f:read(4))
 	end
 
-	result.colors = {}
+	result.palette = nil
 	if result.ncolors and result.ncolors > 0 then
+		result.palette = {}
 		for n=1,result.ncolors do
-			result.colors[n] = string.unpack('<I4', f:read(4))
+			result.palette[n] = string.unpack('<I4', f:read(4))
 		end
 	end
 	local gapsize = imagedata_offset - f:seek()
@@ -114,12 +118,25 @@ function bmp.read_header(f, imagedata_offset)
 		result.data[y] = {}
 	end
 	if result.compression == compressiontypes.BI_RGB then
-		for y=result.height,1,-1 do
-			for x=1,result.width do
-				local b,g,r = string.unpack('BBB', f:read(3))
-				result.data[y][x] = { r, g, b }
+		-- TODO: 1, 4, 16, 32
+		if result.colordepth == 8 then
+			for y=result.height,1,-1 do
+				for x=1,result.width do
+					local idx = string.unpack('B', f:read(1))
+					result.data[y][x] = idx
+				end
+				-- f:read(3 - ((f:seek()-1) % 4))
 			end
-			-- f:read(3 - ((f:seek()-1) % 4))
+		elseif result.colordepth == 24 then
+			for y=result.height,1,-1 do
+				for x=1,result.width do
+					local b,g,r = string.unpack('BBB', f:read(3))
+					result.data[y][x] = (r << 16) | (g << 8) | b
+				end
+				-- f:read(3 - ((f:seek()-1) % 4))
+			end
+		else
+			error('color depth ' .. result.colordepth .. ' invalid or not yet supported')
 		end
 	elseif result.compression == compressiontypes.BI_BITFIELDS then
 		for y=result.height,1,-1 do
@@ -168,6 +185,7 @@ function bmp.read_header(f, imagedata_offset)
 	function result:get(x, y)
 		local function ctz(x)
 			local i = 0
+			if x == 0 then return 32 end
 			while x & 1 == 0 do
 				i = i + 1
 				x = x >> 1
@@ -182,10 +200,10 @@ function bmp.read_header(f, imagedata_offset)
 			return { r, g, b, a }
 		end
 		local function torgba(val)
-			if result.compression == compressiontypes.BI_BITFIELDS then
-				return u32torgba(val)
+			if result.palette then
+				return u32torgba(self.palette[val+1])
 			end
-			return u32torgba(self.colors[val+1])
+			return u32torgba(val)
 		end
 		return torgba(self.data[y][x])
 	end

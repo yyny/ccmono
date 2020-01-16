@@ -339,7 +339,7 @@ function pcf.show_glyphs(data, options)
 			result[#result+1] = lines[n]
 		end
 		if borders then
-			result[#result+1] = string.rep('+' .. string.rep('-', w), #lines[1] // (w+1)) .. '+'
+			result[#result+1] = string.rep('+' .. string.rep('-', w), (#lines ~= 0 and #lines[1] or 0) // (w+1)) .. '+'
 		end
 		n = n + chars_per_row
 	end
@@ -661,7 +661,6 @@ function pcf.tablereaders.bitmaps(self, f)
 			local result = pcf.bitset(w*h)
 			local bytes_per_row = math.ceil(w * storesize / 8)
 			local bytes = {string.unpack(string.rep(string.rep('B', bytes_per_row) .. string.rep('x', padding-bytes_per_row), #s/math.max(padding, bytes_per_row)), s)}
-			bytes[#bytes] = nil
 			local n = 1
 			while n < #bytes do
 				local bits = 0
